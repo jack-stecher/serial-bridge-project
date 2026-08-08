@@ -12,6 +12,11 @@ int main() {
         nullptr
     );
 
+    if (hSerial == INVALID_HANDLE_VALUE) {
+        std::cout << "Failed to open COM3.\n";
+        return 1;
+    }
+    
     DCB dcbSerialParams = {0}; //devicecontrolblock
     dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
     GetCommState(hSerial, &dcbSerialParams);
@@ -21,6 +26,7 @@ int main() {
     dcbSerialParams.Parity = NOPARITY;
     SetCommState(hSerial, &dcbSerialParams);
 
+    //setup read timeouts
     COMMTIMEOUTS timeouts = {0};
     timeouts.ReadIntervalTimeout = 50;
     timeouts.ReadTotalTimeoutConstant = 50;
@@ -29,7 +35,7 @@ int main() {
 
     std::cout << "Port opened successfully.\n";
 
-    //loop here calling ReadFile to pull in bytes
+    //TODO: loop here calling ReadFile to pull in bytes
 
     CloseHandle(hSerial);
     return 0;
