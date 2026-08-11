@@ -65,16 +65,27 @@ std::string currentTimestamp() {
     return oss.str();
 }
 
-// parse example line x,x,x
-// Returns std::nullopt if the line is malformed instead of crashing,
-// since a partial/garbled line from the Arduino is expected occasionally
-// (e.g. right after the port opens, or during a reset).
+// parse example line DATA:x,x,x
+// Returns std::nullopt if the line isn't a telemetry line at all (e.g. it's
+// a command echo/response like "Servo set to 90"), or if a telemetry line
+// is malformed, instead of crashing.
 std::optional<SensorReading> parseLine(const std::string& line) {
+    const std::string prefix = "DATA:";
+
+    // Not a telemetry line -- likely a command response the sketch also
+    // prints (e.g. "LED Green set to 1", "Unknown command: ..."). Not an
+    // error, just not something we want to log as a sensor reading.
+    if (line.rfind(prefix, 0) != 0) {
+        return std::nullopt;
+    }
+
+    std::string data = line.substr(prefix.size());
+
     SensorReading reading{};
 
     // Find the first/second commas
-    size_t comma1 = line.find(',');
-    size_t comma2 = line.find(',', comma1 + 1);
+    size_t comma1 = data.find(',');
+    size_t comma2 = data.find(',', comma1 + 1);
 
     // Make sure both commas were found
     if (comma1 == std::string::npos || comma2 == std::string::npos) {
@@ -84,13 +95,13 @@ std::optional<SensorReading> parseLine(const std::string& line) {
     // Extract and convert each value
     try {
         reading.potentiometer =
-            std::stoi(line.substr(0, comma1));
+            std::stoi(data.substr(0, comma1));
 
         reading.buttonPressed =
-            std::stoi(line.substr(comma1 + 1, comma2 - comma1 - 1));
+            std::stoi(data.substr(comma1 + 1, comma2 - comma1 - 1));
 
         reading.lightLevel =
-            std::stoi(line.substr(comma2 + 1));
+            std::stoi(data.substr(comma2 + 1));
     } catch (const std::exception&) {
         // stoi throws on empty/non-numeric text (invalid_argument) or a
         // number too large to fit in an int (out_of_range) -- either way,
@@ -113,7 +124,8 @@ void sendCommand(HANDLE hSerial, const std::string& cmd) {
 
 // Runs on its own thread. Continuously reads bytes from the Arduino,
 // assembles complete lines, prints parsed sensor readings, and logs each
-// valid reading to the CSV file with a timestamp.
+// valid reading to the CSV file with a timestamp. Non-telemetry lines
+// (command responses/echoes) are printed but not logged.
 void readerLoop(HANDLE hSerial, std::ofstream& csv) {
     std::string buffer;
     char byte;
@@ -151,8 +163,12 @@ void readerLoop(HANDLE hSerial, std::ofstream& csv) {
                             << reading->buttonPressed << ","
                             << reading->lightLevel << "\n";
                         csv.flush();
-                    } else {
-                        printLine("Skipped malformed line.\n");
+                    } else if (!buffer.empty()) {
+                        // Not telemetry -- likely a command response/echo
+                        // from the Arduino (e.g. "Servo set to 90"). Print
+                        // it so you still see command confirmations, but
+                        // don't log it to the CSV or call it "malformed".
+                        printLine(buffer + "\n");
                     }
 
                     buffer.clear();
