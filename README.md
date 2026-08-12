@@ -39,8 +39,6 @@ A live console dashboard for Windows that talks to an Arduino over serial: it st
 
 ![Serial Bridge Circuit Wiring](images/serial_bridge.jpg)
 
-*(Add a photo or diagram of the assembled circuit here — see the table above for exact pin mappings.)*
-
 ## Software Requirements
 
 - **Arduino IDE** (or the VS Code Arduino extension) with the `Servo` library installed, for flashing the firmware
